@@ -1,0 +1,13 @@
+{
+    "autoload": {
+        "psr-0": {
+            "": [
+                "lib/",
+                "apitest/lib/"
+                ]
+        }
+    },
+      "require": {
+        "atk4/atk4": "4.3.*@dev"
+      }
+}
