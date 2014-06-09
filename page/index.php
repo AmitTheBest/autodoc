@@ -5,6 +5,9 @@ class page_index extends Page
     {
         parent::init();
 
-        $this->add('LoremIpsum');
+        $cr=$this->add('CRUD');
+        $cr->setModel('SourceFile');
+
+        $cr->addAction('refresh','column');
     }
 }

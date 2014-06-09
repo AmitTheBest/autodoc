@@ -4,5 +4,9 @@ class Admin extends App_Admin {
     {
         parent::init();
 
+        $this->pathfinder->base_location->defineContents([ 'addons'=>'atk4-addons']);
+
+
+
     }
 }
