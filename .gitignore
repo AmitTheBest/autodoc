@@ -10,3 +10,5 @@ composer.phar
 composer.lock
 /vendor/*
 /atk4-addons/*
+
+*.db
