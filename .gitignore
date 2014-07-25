@@ -10,5 +10,8 @@ composer.phar
 composer.lock
 /vendor/*
 /atk4-addons/*
-
+book
+.idea
+agiletoolkit-css
+data
 *.db

@@ -7,7 +7,14 @@
                 ]
         }
     },
-      "require": {
-        "atk4/atk4": "4.3.*@dev"
-      }
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "git@github.com:Gregwar/RST.git"
+        }
+    ],
+        "require": {
+            "atk4/atk4": "4.3.*@dev",
+            "gregwar/rst": "dev-master"
+        }
 }
