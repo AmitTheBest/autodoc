@@ -29,40 +29,24 @@ class Model_SourceFile extends Model
         if(!$this->loaded()){
             throw $this->exception('Model is not loaded');
         }
-
-        //with parser
-//        $rstparser = $this->add('Controller_RstParser');
-//        $content = $rstparser->getFileContent($path);
-//        return $out;
-
-
-//        $dox = $this->add('Controller_Doxphp');
-
-//        $json = $dox->getClassContent('vendor/atk4/atk4/'.$path);
-
-//        $sphinx = $dox->convertJSON2Sphinx($json);
-//        return $sphinx;
-
-        //php bin/doxphp  < path/to/atk4/lib/Order.php
-        //php bin/doxphp  < path/to/atk4/lib/Order.php | php bin/doxphp2sphinx
-
-        //Parse atk class file
-        //Parse .rst file
         if(!$this['doc_location']){
-            throw $this->exception('Doc location is not specified. Please hit the "Get doc location button".');
+            throw $this->exception('Doc location is not specified. Please hit the "Get doc location" button.');
         }
+
         $path = $this->api->locate('book','en/'.$this['doc_location'].'.rst');
         if(!$path){
             return 'There is no such a file';
         }
 
-        //Find the pattern '.. php:class:class::CLASSNAME'
-        $content = file_get_contents($path);
-        $content = preg_match_all('/[.]{2}\s[p]hp:class::\s([a-zA-z]*)/',$content,$out);
+        $classes = $this->parseFile($path);
 
 //        return $out;
-        foreach($out[1] as $k=>$v){
-            if($v === $this['file']){
+        foreach($classes[1] as $class){
+            if($class === $this['file']){
+                $content = $this->parseClass($class);
+//                var_dump($content);
+//                return $content;
+                $this['contents'] = $content;
                 $this['last_imported'] = date('d/m/Y');
                 $this->save();
                 return 'Successfuly injected';
@@ -73,7 +57,23 @@ class Model_SourceFile extends Model
 
         return 'Nothing changed';
     }
-    function createClassInstance(){
+    private function parseClass($class){
+        $path = $this->app->pathfinder->atk_location->getPath().'/lib/'.$class.'.php';
+        $content = file_get_contents($path);
+        if(!$content){
+            throw $this->exception('wrong path to atk file');
+        }
+        $dox = $this->add('Controller_Doxphp');
+        $json = $dox->getClassContent($path);
+        $sphinx = $dox->convertJSON2Sphinx($json);
+        return $sphinx;
+    }
+    private function parseFile($path){
+        $content = file_get_contents($path);
+        preg_match_all('/[.]{2}\s[p]hp:class::\s([a-zA-z]*)/',$content,$out);
+        return $out;
+    }
+    function getDocLocation(){
         if(!$this->loaded()){
             throw $this->exception('Model is not loaded');
         }
