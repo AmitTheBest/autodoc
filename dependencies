@@ -1,3 +1,4 @@
 vendor/atk4/atk4 https://github.com/atk4/atk4.git
 atk4-addons https://github.com/atk4/atk4-addons.git
 vendor/doxphp https://github.com/avalanche123/doxphp.git
+book git@github.com:atk4/book.git
