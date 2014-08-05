@@ -5,6 +5,7 @@
 class Model_SourceFile extends Model
 {
     public $table="sourcefile";
+    private $path;//The path to rst file
 
     /**
      * init model
@@ -33,30 +34,67 @@ class Model_SourceFile extends Model
             throw $this->exception('Doc location is not specified. Please hit the "Get doc location" button.');
         }
 
-        $path = $this->api->locate('book','en/'.$this['doc_location'].'.rst');
-        if(!$path){
+        $this->path = $this->api->locate('book','en/'.$this['doc_location'].'.rst');
+        if(!$this->path){
             return 'There is no such a file';
         }
 
-        $classes = $this->parseFile($path);
+        $rst_content = $this->parseFile();
+        $classes = $this->getClassesArray($rst_content);
 
-//        return $out;
+        $this->replaceClassComment($rst_content,$classes);
+    }
+
+    /**
+     * Replaces or adds a description.....
+     * @param $rst_content
+     * @param $classes
+     * @return string
+     */
+    private function replaceClassComment($rst_content,$classes){
         foreach($classes[1] as $class){
-            if($class === $this['file']){
-                $content = $this->parseClass($class);
-//                var_dump($content);
-//                return $content;
-                $this['contents'] = $content;
+            if($class[0] === $this['file']){
+                $pos_class_start = $class[1];// The start position of class NAME in the pattern in rst file
+
+                //Get class comment
+                $replacement = $this->parseClass($class[0]);
+
+                //Find the start position of replacement
+                $pos_star_replacement = strpos($rst_content,'    ',$pos_class_start);
+
+                //Find the end position (the length) of replacement
+                preg_match('/\n([a-zA-Z]+)/',$rst_content,$out,PREG_OFFSET_CAPTURE,$pos_class_start);
+                $pos_end_replacement = $out[0][1];
+                $length = $pos_end_replacement-$pos_star_replacement;
+
+                //Replace the content
+                $rst_content = substr_replace($rst_content,$replacement."\n\n",$pos_star_replacement,$length);
+
+                //Save new content to rst file
+                $this->saveRst($rst_content);
+
+                //Save all data to db
+                $this['contents'] = $replacement;
                 $this['last_imported'] = date('d/m/Y');
                 $this->save();
-                return 'Successfuly injected';
+                echo ('Successfully injected');
             }
         }
-
-
-
-        return 'Nothing changed';
     }
+
+    /**
+     * @param $content
+     */
+    private function saveRst($content){
+        $q = file_put_contents($this->path,$content);
+    }
+
+    /**
+     * Returns a string of properties and methods
+     * @param $class
+     * @return mixed
+     * @throws BaseException
+     */
     private function parseClass($class){
         $path = $this->app->pathfinder->atk_location->getPath().'/lib/'.$class.'.php';
         $content = file_get_contents($path);
@@ -68,11 +106,28 @@ class Model_SourceFile extends Model
         $sphinx = $dox->convertJSON2Sphinx($json);
         return $sphinx;
     }
-    private function parseFile($path){
-        $content = file_get_contents($path);
-        preg_match_all('/[.]{2}\s[p]hp:class::\s([a-zA-z]*)/',$content,$out);
+
+    /**
+     * @return string
+     */
+    private function parseFile(){
+        $content = file_get_contents($this->path);
+        return $content;
+    }
+
+    /**
+     * @param $content
+     * @return mixed
+     */
+    private function getClassesArray($content){
+        preg_match_all('/[.]{2}\s[p]hp:class::\s([a-zA-z]*)/',$content,$out,PREG_OFFSET_CAPTURE);
         return $out;
     }
+
+    /**
+     * @return string
+     * @throws BaseException
+     */
     function getDocLocation(){
         if(!$this->loaded()){
             throw $this->exception('Model is not loaded');
