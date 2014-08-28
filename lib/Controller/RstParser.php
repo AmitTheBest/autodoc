@@ -10,6 +10,7 @@ class Controller_RstParser extends AbstractController{
         parent::init();
 
         $this->parser = new Gregwar\RST\Parser;
+//        $this->parser->registerDirective('class');
 
     }
     function getFileContent($path){

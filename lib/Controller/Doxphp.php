@@ -28,13 +28,13 @@ class Controller_Doxphp extends AbstractController{
             $tokens = new DoxPHP\Parser\Tokens(file_get_contents($path));
             $parser = new DoxPHP\Parser\Parser();
 
-            return json_encode($parser->parse($tokens));
+            return $parser->parse($tokens);
         } catch (Exception $e) {
             throw $this->exception($e->getMessage());
         }
     }
-    function convertJSON2Sphinx($json){
-        $blocks = json_decode($json);
+    function convertJSON2Sphinx($blocks){
+//        $blocks = json_decode($blocks);
         $out    = '';
         $indent = '   ';
         $level  = 0;

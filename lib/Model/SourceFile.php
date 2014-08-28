@@ -2,7 +2,7 @@
 /**
  * Model implementation
  */
-class Model_SourceFile extends Model
+class Model_SourceFile extends SQL_Model
 {
     public $table="sourcefile";
     private $path;//The path to rst file
@@ -16,14 +16,14 @@ class Model_SourceFile extends Model
     {
         parent::init();
 
-        $this->setSource('SQLite');
+//        $this->setSource('SQLite');
 
         $this->addField('file');
         $this->addField('last_imported')->type('date');
         $this->addField('contents')->type('text');
         $this->addField('doc_location');
 
-        $this->add('dynamic_model/Controller_AutoCreator_SQLite');
+//        $this->add('dynamic_model/Controller_AutoCreator_MySQL');
     }
 
     function refresh() {
@@ -39,62 +39,94 @@ class Model_SourceFile extends Model
             return 'There is no such a file';
         }
 
+        $count_injections = 0;
+        $replaced_tags = '';
+        //First parse rst file and get an array of classes, methods and variables
         $rst_content = $this->parseFile();
-        $classes = $this->getClassesArray($rst_content);
+        $array = $this->getArray($rst_content);
 
-        $this->replaceClassComment($rst_content,$classes);
+        //Get class content to parse
+        $class_content = $this->parseClass($this['file']);
+
+        $count = 0;
+        $rst_content_new = null;
+        foreach($array[2] as $k=>$tag){
+            //Each iteration we have to parse string from the scratch cause it was changed
+            $rst_content_new = $this->parseFile();
+            $array_new = $this->getArray($rst_content_new);
+
+            $count++;
+
+            /****************************/
+            /*For testing purposes only*/
+            $do = 1;//select necessary iteration
+            if($count < $do) continue;
+            if($count > $do) break;
+            /*************************/
+
+            //Define the replacement area
+            //Find the start position of replacement
+            $start = $this->getStartPosition($rst_content_new,$array_new[2][$k][1]);
+
+            //Find the end position (the length) of replacement
+            $end = $this->getEndPosition($rst_content_new,$start);
+            $length = $end-$start;
+
+            // If no comment present - skip
+            $string_end_pos = $array_new[2][$k][1]+strlen($array_new[2][$k][0]);
+            if($start-$string_end_pos != 2){
+                continue;
+            }
+
+            //Now get new content
+            $replacement = $this->getBlockDescription($class_content,$array_new[2][$k][0]);
+            if(!$replacement || $replacement == '') continue;
+
+            $count_injections++;
+            $replaced_tags .= $array_new[2][$k][0].', ';
+
+            //Replace the content with the new one from the class
+            $rst_content_new = $this->replaceComment($rst_content_new,$replacement,$start,$length);
+
+            //Finally save data to the rst file and to the db
+//            $this->saveRst($rst_content_new);
+        }
+        //Save all data to db
+        if($rst_content_new){
+            $this['contents'] = $rst_content_new;
+        }
+//        $this['last_imported'] = date('d/m/Y');
+//        $this->save();
+        return ('Successfully injected '.$count_injections.' comments. Replaced comments for: '.$replaced_tags);
     }
 
-    /**
-     * Replaces or adds a description.....
-     * @param $rst_content
-     * @param $classes
-     * @return string
-     */
-    private function replaceClassComment($rst_content,$classes){
-        foreach($classes[1] as $class){
-            if($class[0] === $this['file']){
-                $pos_class_start = $class[1];// The start position of class NAME in the pattern in rst file
+    private function getBlockDescription($blocks, $tag){
+        $count = 0;
+        foreach ($blocks as $block) {
+            $block_name = $block->name;
+            $count++;
 
-                //Get class comment
-                $replacement = $this->parseClass($class[0]);
-
-                //Find the start position of replacement
-                $pos_star_replacement = strpos($rst_content,'    ',$pos_class_start);
-
-                //Find the end position (the length) of replacement
-                preg_match('/\n([a-zA-Z]+)/',$rst_content,$out,PREG_OFFSET_CAPTURE,$pos_class_start);
-                $pos_end_replacement = $out[0][1];
-                $length = $pos_end_replacement-$pos_star_replacement;
-
-                //Replace the content
-                $rst_content = substr_replace($rst_content,$replacement."\n\n",$pos_star_replacement,$length);
-
-                //Save new content to rst file
-                $this->saveRst($rst_content);
-
-                //Save all data to db
-                $this['contents'] = $replacement;
-                $this['last_imported'] = date('d/m/Y');
-                $this->save();
-                echo ('Successfully injected');
+            if ($block->isPrivate) {
+                continue;
             }
+
+            if($block->type == 'variable'){
+                $block_name = substr($block->name,1);
+            }elseif($block->type == 'method'){
+                preg_match('/::([a-zA-Z_]*)/',$block->name,$out);
+                $block_name = $out[1];
+            }
+
+            if($block_name === $tag){
+                if($block->description){
+                    return $block->description;
+                }else{
+                    return false;
+                }
+            }
+
         }
     }
-
-    /**
-     * @param $content
-     */
-    private function saveRst($content){
-        $q = file_put_contents($this->path,$content);
-    }
-
-    /**
-     * Returns a string of properties and methods
-     * @param $class
-     * @return mixed
-     * @throws BaseException
-     */
     private function parseClass($class){
         $path = $this->app->pathfinder->atk_location->getPath().'/lib/'.$class.'.php';
         $content = file_get_contents($path);
@@ -102,9 +134,8 @@ class Model_SourceFile extends Model
             throw $this->exception('wrong path to atk file');
         }
         $dox = $this->add('Controller_Doxphp');
-        $json = $dox->getClassContent($path);
-        $sphinx = $dox->convertJSON2Sphinx($json);
-        return $sphinx;
+        $array = $dox->getClassContent($path);
+        return $array;
     }
 
     /**
@@ -117,13 +148,50 @@ class Model_SourceFile extends Model
 
     /**
      * @param $content
+     */
+    private function saveRst($content){
+        file_put_contents($this->path,$content);
+    }
+
+    /**
+     * @param $content
      * @return mixed
      */
-    private function getClassesArray($content){
-        preg_match_all('/[.]{2}\s[p]hp:class::\s([a-zA-z]*)/',$content,$out,PREG_OFFSET_CAPTURE);
+    private function getArray($content){
+        preg_match_all('/[.]{2}\s[p]hp:([a-zA-Z]*)\:\:\s([a-zA-Z_]*)/',$content,$out,PREG_OFFSET_CAPTURE);
         return $out;
     }
 
+    /**
+     * @param $content
+     * @param $replacement
+     * @param $start
+     * @param $length
+     * @return mixed
+     */
+    private function replaceComment($content,$replacement,$start,$length){
+        return substr_replace($content,'    '.$replacement."\n",$start,$length);
+    }
+
+    /**
+     * @param $content
+     * @param $offset
+     * @return mixed
+     */
+    private function getStartPosition($content,$offset){
+        preg_match('/[\s]{4}[a-zA-Z]/',$content,$start,PREG_OFFSET_CAPTURE,$offset);
+        return $start[0][1];
+    }
+
+    /**
+     * @param $content
+     * @param $offset
+     * @return mixed
+     */
+    private function getEndPosition($content,$offset){
+        preg_match('/\n[a-zA-Z.]+/',$content,$end,PREG_OFFSET_CAPTURE,$offset);
+        return $end[0][1];
+    }
     /**
      * @return string
      * @throws BaseException

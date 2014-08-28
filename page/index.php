@@ -5,8 +5,9 @@ class page_index extends Page
     {
         parent::init();
 
+        $m = $this->add('Model_SourceFile');
         $cr=$this->add('CRUD');
-        $cr->setModel('SourceFile');
+        $cr->setModel($m);
 
         $cr->addAction('refresh','column');
         $cr->addAction('getDocLocation',['column'=>true,'toolbar'=>false,'descr'=>'Get doc location']);
