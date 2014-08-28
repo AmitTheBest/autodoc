@@ -59,9 +59,9 @@ class Model_SourceFile extends SQL_Model
 
             /****************************/
             /*For testing purposes only*/
-            $do = 1;//select necessary iteration
-            if($count < $do) continue;
-            if($count > $do) break;
+//            $do = 1;//select necessary iteration
+//            if($count < $do) continue;
+//            if($count > $do) break;
             /*************************/
 
             //Define the replacement area
@@ -89,14 +89,14 @@ class Model_SourceFile extends SQL_Model
             $rst_content_new = $this->replaceComment($rst_content_new,$replacement,$start,$length);
 
             //Finally save data to the rst file and to the db
-//            $this->saveRst($rst_content_new);
+            $this->saveRst($rst_content_new);
         }
         //Save all data to db
         if($rst_content_new){
             $this['contents'] = $rst_content_new;
         }
-//        $this['last_imported'] = date('d/m/Y');
-//        $this->save();
+        $this['last_imported'] = date('d/m/Y');
+        $this->save();
         return ('Successfully injected '.$count_injections.' comments. Replaced comments for: '.$replaced_tags);
     }
 
