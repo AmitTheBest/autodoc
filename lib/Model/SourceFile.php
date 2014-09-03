@@ -170,7 +170,8 @@ class Model_SourceFile extends SQL_Model
      * @return mixed
      */
     private function replaceComment($content,$replacement,$start,$length){
-        return substr_replace($content,'    '.$replacement."\n",$start,$length);
+        $replacement = preg_replace('/^/m', '    ', $replacement);
+        return substr_replace($content,$replacement."\n",$start,$length);
     }
 
     /**
