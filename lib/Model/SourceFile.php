@@ -95,7 +95,7 @@ class Model_SourceFile extends SQL_Model
         if($rst_content_new){
             $this['contents'] = $rst_content_new;
         }
-        $this['last_imported'] = date('d/m/Y');
+        $this['last_imported'] = date('Y/m/d');
         $this->save();
         return ('Successfully injected '.$count_injections.' comments. Replaced comments for: '.$replaced_tags);
     }
