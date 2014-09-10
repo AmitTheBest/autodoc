@@ -201,13 +201,12 @@ class Model_SourceFile extends SQL_Model
         if(!$this->loaded()){
             throw $this->exception('Model is not loaded');
         }
-        $file = new $this['file'];
-        if(!$file){
-            throw $this->exception('Wrong class name.');
+        if(!$this['file'] || $this['file'] == ''){
+            throw $this->exception('Empty class name.');
         }
-        $file = substr($file->_doc,29);
-        $file = str_replace('.html','',$file);
-        $this['doc_location'] = $file;
+        $path = $this['file']::DOC;
+        if(!$path)throw $this->exception('The path to the doc file is not specified.');
+        $this['doc_location'] = $path;
         $this->save();
         return 'Saved';
     }
