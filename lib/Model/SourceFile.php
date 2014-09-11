@@ -59,7 +59,7 @@ class Model_SourceFile extends SQL_Model
 
             /****************************/
             /*For testing purposes only*/
-//            $do = 1;//select necessary iteration
+//            $do = 4;//select necessary iteration
 //            if($count < $do) continue;
 //            if($count > $do) break;
             /*************************/
@@ -74,6 +74,7 @@ class Model_SourceFile extends SQL_Model
 
             // If no comment present - skip
             $string_end_pos = $array_new[2][$k][1]+strlen($array_new[2][$k][0]);
+
             if($start-$string_end_pos != 2){
                 continue;
             }
@@ -106,6 +107,13 @@ class Model_SourceFile extends SQL_Model
             $block_name = $block->name;
             $count++;
 
+            /****************************/
+            /*For testing purposes only*/
+//            $do = 12;//select necessary iteration
+//            if($count < $do) continue;
+//            if($count > $do) break;
+            /*************************/
+
             if ($block->isPrivate) {
                 continue;
             }
@@ -116,6 +124,10 @@ class Model_SourceFile extends SQL_Model
                 preg_match('/::([a-zA-Z_]*)/',$block->name,$out);
                 $block_name = $out[1];
             }
+
+            //Clear tag from arguments
+            preg_match('/[a-zA-z_]*/',$tag,$out);
+            $tag = $out[0];
 
             if($block_name === $tag){
                 if($block->description){
@@ -158,7 +170,7 @@ class Model_SourceFile extends SQL_Model
      * @return mixed
      */
     private function getArray($content){
-        preg_match_all('/[.]{2}\s[p]hp:([a-zA-Z]*)\:\:\s([a-zA-Z_]*)/',$content,$out,PREG_OFFSET_CAPTURE);
+        preg_match_all('/[.]{2}\s[p]hp:([a-zA-Z]*)\:\:\s([^\n]*)/',$content,$out,PREG_OFFSET_CAPTURE);
         return $out;
     }
 
