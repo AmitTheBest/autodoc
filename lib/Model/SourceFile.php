@@ -40,7 +40,9 @@ class Model_SourceFile extends SQL_Model
         }
 
         $count_injections = 0;
+        $count_injected_args = 0;
         $replaced_tags = '';
+        $added_args_tags = '';
         //First parse rst file and get an array of classes, methods and variables
         $rst_content = $this->parseFile();
         $array = $this->getArray($rst_content);
@@ -51,7 +53,7 @@ class Model_SourceFile extends SQL_Model
         $count = 0;
         $rst_content_new = null;
         foreach($array[2] as $k=>$tag){
-            //Each iteration we have to parse string from the scratch cause it was changed
+            //Each iteration we have to parse string from the scratch cause it may be changed
             $rst_content_new = $this->parseFile();
             $array_new = $this->getArray($rst_content_new);
 
@@ -75,21 +77,27 @@ class Model_SourceFile extends SQL_Model
             // If no comment present - skip
             $string_end_pos = $array_new[2][$k][1]+strlen($array_new[2][$k][0]);
 
-            if($start-$string_end_pos != 2){
-                continue;
-            }
-
             //Now get new content
             $replacement = $this->getBlockDescription($class_content,$array_new[2][$k][0]);
-            if(!$replacement || $replacement == '') continue;
-
-            $count_injections++;
-            $replaced_tags .= $array_new[2][$k][0].', ';
 
             //Replace the content with the new one from the class
-            $rst_content_new = $this->replaceComment($rst_content_new,$replacement,$start,$length);
+            if($start-$string_end_pos == 2 && ($replacement && $replacement != '')){
+                $rst_content_new = $this->replaceContent($rst_content_new,$replacement,$start,$length);
+                $count_injections++;
+                $replaced_tags .= $array_new[2][$k][0].', ';
+            }
 
-            //Finally save data to the rst file and to the db
+            //Check if method in php have argument(s) but not in rst
+            $a = $this->findArguments($class_content,$array_new[2][$k][0]);
+
+            if($a){
+                //Add arguments
+                $rst_content_new = substr_replace($rst_content_new,$a,$string_end_pos,null);
+                $count_injected_args++;
+                $added_args_tags .= $array_new[2][$k][0].', ';
+            }
+
+            //Finally save data to the rst file
             $this->saveRst($rst_content_new);
         }
         //Save all data to db
@@ -98,9 +106,59 @@ class Model_SourceFile extends SQL_Model
         }
         $this['last_imported'] = date('Y/m/d');
         $this->save();
-        return ('Successfully injected '.$count_injections.' comments. Replaced comments for: '.$replaced_tags);
+
+        $return = '';
+        if($count_injections>0){
+            $return .= 'Successfully injected '.$count_injections.' comments. Replaced comments for: '.$replaced_tags.'.';
+        }
+        if($count_injected_args>0){
+            $return .= 'Successfully added arguments to the '.$count_injected_args.' methods: '.$added_args_tags.'.';
+        }
+
+        if($return != '') return $return;
+
+        return ('Nothing to change');
+
     }
 
+    private function findArguments($blocks, $tag){
+        $count = 0;
+        foreach ($blocks as $block) {
+
+            if ($block->isPrivate) {
+                continue;
+            }
+
+            if($block->type != 'method'){
+                continue;
+            }
+
+            $count++;
+
+            preg_match('/::([a-zA-Z_]*)/',$block->name,$out);
+            $block_name = $out[1];
+
+            /****************************/
+            /*For testing purposes only*/
+//            $do = 7;//select necessary iteration
+//            if($count < $do) continue;
+//            if($count > $do) break;
+            /*************************/
+
+            //Clear tag from arguments
+            preg_match('/[a-zA-z_]*/',$tag,$out);
+            $tag_cleared = $out[0];
+
+            if($block_name === $tag_cleared){
+                //Exclude if argument(s) is present in rst
+                if($tag == $tag_cleared){
+                    preg_match('/function\s[a-zA-z_]*([(][^)]*[)])/',$block->code,$code);
+                    return $code[1];
+                }
+            }
+        }
+        return null;
+    }
     private function getBlockDescription($blocks, $tag){
         $count = 0;
         foreach ($blocks as $block) {
@@ -178,10 +236,10 @@ class Model_SourceFile extends SQL_Model
      * @param $content
      * @param $replacement
      * @param $start
-     * @param $length
+     * @param null $length
      * @return mixed
      */
-    private function replaceComment($content,$replacement,$start,$length){
+    private function replaceContent($content,$replacement,$start,$length=null){
         $replacement = preg_replace('/^/m', '    ', $replacement);
         return substr_replace($content,$replacement."\n",$start,$length);
     }
